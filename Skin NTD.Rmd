@@ -1,0 +1,392 @@
+---
+title: "SkinNTD"
+author: "William Jones-Warner"
+output:
+  flexdashboard::flex_dashboard:
+    storyboard: true
+    social: menu
+    source: embed
+    css = <style type="text/css"> .sidebar { overflow: auto; } </style>
+---
+
+### Introduction to the Dashboard
+
+*Background*
+
+Country: Ghana  
+Endemic skin-NTDs of interest: Buruli ulcer, leprosy, lymphatic filariasis, scabies, yaws
+
+Skin neglected tropical diseases are a family of diseases that are endemic in tropical regions and disproportionately impact the more impoverished within a society. Due to the locality of effected areas and groups of people people these diseases resources to combating these diseases are limited. While it is estimated that skin conditions impact 1.8 billion people globally and make up 10% of diseases in tropical settings. While this is an estimate the true prevalence is often unknown due to under reporting. 
+
+Buruli ulcer, leprosy, lymphatic filariasis, scabies, and yaws are all neglected tropical diseases (NTD) that have had a significant impact on public health in Ghana. 
+
+In this report we have compiled a collection of 8 secondary data sets that act as indicators, proxies or predictors of Skin NTD risk. Summerised at a district level, these metrics either act to help up identify a district that can be at risk of being endemic for a Skin NTD, have a population with a high risk of infection, missed diagnosis, poor clinical outcome if infected or a population that might not seek help if infected. When collected and viewed together it can enable us to identify a distract that might be under reporting Skin NTD prevalence, therefore be a suitable target for improved case detection surveys. 
+ 
+Proxies are catagorised into 5 different indicator groups for which they represent, these are;  
+ - Indicators of Endemicity (EN); BU Predicted Endemicity and LF Prevalence.  
+ - Vulnerability to Infection (IN); Improved Housing Prevalence and Socioeconomic Wealth Index.   
+ - Low Access to Care (LAC); Travel Time to Health Care Centre and DTP Vaccination Coverage.  
+ - Risk Factors for Non-Diagnosis (ND); Population Per Health Care Centre.  
+ - Risk Factors for Poor Clinical Outcome (PCO); Under 5 Mortality.  
+
+### Contents
+
+*Slides Contained in Report*
+
+*Contents*   
+  
+ - Page 1 - How to Use this Guide.  
+  
+ - Page 2- Conceptual framework.  
+  
+ - Chart 1 - Map displaying metrics for each distrcit colour coded.  
+  
+ - Chart 2 - Data table displaying districts quintiles. 
+  
+ - Chart 3 - Data table displaying metrics with raw data values for each District.  
+
+### Page 1 - How to Use this Guide
+
+*Instructions*
+
+ - *Understanding the Conceptual Framework*  
+ On this page we explore the 5 main contributing factors for a population to be vulnerable to Skin NTDs.  
+ These factors are split into causes and risk factors which we then explored to find data proxies to identify districts that would be at risk of high skin NTD burdens.   
+ The coloured boxs represent data proxies we have identified and been able to collect and use for representing the populations risk of skin NTD burden. 
+
+ - *How to use the Map*  
+ The map pages allows one to view the collated quintuples into the respective risk factor groupings. 
+ Initially the Map page will display no maps apart from a legend with the different options. 
+ One can select the map you would like to view on the key at the top right and hover your mouse over the district, there will be a break down of which quintiles the districts fall into for each proxy in that risk factor grouping. 
+ 
+  - *Districts Quintile Table*  
+  This data table displays all district's quintiles for each data proxy allows one to filter on ascending or descending values to rank districts accordingly.    
+  
+  - *Districts Raw Data Table*  
+  This data table displays all district's raw values for each data proxy allows one to filter on ascending or descending values to rank districts accordingly.   
+
+```{r Packages, include=FALSE}
+
+library(dplyr)
+library(lubridate)
+library(statar)
+library(flexdashboard)
+library(plotly)
+library(cowplot)
+library(knitr)
+library(stringr)
+library(leaflet)
+library(sf)
+library(hms)
+library(mapview)
+library(tmap)
+library(kableExtra)
+library(stargazer)
+library(DT)
+library(pandoc)
+
+setwd("/Users/williamjoneswarner/Desktop/Work/Buruli Ulcer/Dashboard/Dashboard R Project")
+
+df <- read.csv("Dashboard_files/Mean_Quint_merged_shp.csv")
+
+df$wlth_qn_rev <- 6-df$wlth_qn 
+df$Hsng_qn_rev <- 6-df$Hsng_qn
+df$DPT_qnt_rev <- 6-df$DPT_qnt
+
+names(df)
+selected_columns <- df[c("OBJECTI", "REGION", "DISTRIC")]
+# Filter columns based on name containing 'q'
+columns_with_q <- df[, grepl("q", names(df))]
+# Combine both selections into a new dataframe 'df_q'
+df_q <- cbind(selected_columns, columns_with_q)
+
+selected_columns2 <- df_q[, c("OBJECTI", "REGION", "DISTRIC", "BU_qunt", "LF_qntl", "Hsng_qn_rev", "wlth_qn_rev", "csts_qn", "DPT_qnt_rev", "HCC_qn0", "U5M_qnt")]
+df_q <- df_q %>% 
+  select(OBJECTI, REGION, DISTRIC, BU_qunt, LF_qntl, Hsng_qn_rev, wlth_qn_rev, csts_qn, DPT_qnt_rev, HCC_qn0, U5M_qnt)
+
+
+colnames(df_q) <- c("OBJECTID", "REGION", "DISTRICT", "EN - BU", "EN - LF", "IN - Improved Housing", "IN - Wealth", "LAC - Travel Costs", "LAC - DPT", "ND - Pop Per HCC", "PCO - U5M")
+
+head(df_q)
+
+df_q$Total <- (df_q$`LAC - Travel Costs` + df_q$`IN - Wealth` + df_q$`PCO - U5M` + df_q$`ND - Pop Per HCC` + df_q$`EN - BU` + df_q$`IN - Improved Housing` + df_q$`LAC - DPT` + df_q$`EN - LF`)
+
+df_mean <- df %>% 
+  select(OBJECTI, REGION, DISTRIC,  BU_cvrg, LF, imprv_h, wlth_mn, csts_mn, dpt_cvr, pp__HCC, U5M)
+
+colnames(df_mean) <- c("OBJECTID", "REGION", "DISTRICT", "EN - BU", "EN - LF", "IN - Improved Housing", "IN - Wealth", "LAC - Travel Costs", "LAC - DPT", "ND - Pop Per HCC", "PCO - U5M")
+
+cols_to_round <- c("EN - BU", "EN - LF", "IN - Improved Housing", "IN - Wealth", "LAC - Travel Costs", "LAC - DPT", "ND - Pop Per HCC", "PCO - U5M")
+df_mean[, cols_to_round] <- round(df_mean[, cols_to_round], 3)
+
+head(df_mean)
+```
+### Page 2 - Conceptual Framework
+
+*Conceptual Framework*
+
+Here outlines the indicators that were chosen to represent each contributing risk factor to Skin NTD prevalence, under-reporting and mis-diagnosis in Ghana. 
+
+The coloured boxes in the final coloumn labeled 'Distrcit Level Mectics/Proxies" represent those that were chosen. While those greyed out boxes represent those that were not.
+
+Boxes with '*' represent datasets not currently available but would represent good indicators or proxies. 
+
+![](Dashboard_files/conceptual_framework_BU5.png)
+
+
+### Chart 1 - Map
+
+Please Selected a layer to display
+
+```{r Map Setup, include=FALSE, cache=FALSE, echo=FALSE}
+
+data <- st_read("Dashboard_files/Mean_Quint_merged_shp2.shp")
+columns_to_remove <- c("mbl_qnt", "mobl_mn", "urbn_qn", "urbn_pr", "rod_qnt", "Pr_wt1R", "pp_dnst", "pop_qnt", "MVC_cvr", "MVC_qnt")
+data <-  data %>% select(-one_of(columns_to_remove))
+
+data$wlth_qn_rev <- 6-data$wlth_qn
+data$Hsng_qn_rev <- 6-data$Hsng_qn
+data$DPT_qnt_rev <- 6-data$DPT_qnt
+data$Ttl_SUM <- data$csts_qn + data$U5M_qnt + data$HCC_qn0 + data$BU_qunt + data$LF_qntl + data$wlth_qn_rev + data$Hsng_qn_rev + data$DPT_qnt_rev
+
+names(data)
+
+data$Ttl_EN <- data$BU_qunt + data$LF_qntl
+data$Ttl_IN <- data$Hsng_qn_rev + data$wlth_qn_rev
+data$Ttl_LAC <- data$csts_qn + data$DPT_qnt_rev
+data$Ttl_ND <- data$HCC_qn0
+data$Ttl_PCO <- data$U5M_qnt
+
+names(data)
+
+quantiles <- (0:5) / 5  
+
+# Define your custom bin edges
+
+bin_edgesTtl_SUM <- c(0, 7, 15, 23, 31, 40)
+bin_edgesTtl_EN <- c(0,2,4,6,8,10)
+bin_edgesTtl_IN <- c(0,2,4,6,8,10)
+bin_edgesTtl_LAC <- c(0,2,4,6,8,10)
+bin_edgesTtl_ND <- c(0,1,2,3,4,5)
+bin_edgesTtl_PCO <- c(0,1,2,3,4,5)
+
+
+
+Total <- c("#1a9641", "#a6d96a","#ffffbf",  "#fdae61", "#d7191c", "#8B0000")
+Reverse <- c("#8B0000", "#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641")
+
+# Create color bins for the variable data$POPperHCC
+
+palTtl_SUM <- colorBin(Total, domain = data$Ttl_SUM, bins = bin_edgesTtl_SUM, right = TRUE)
+palTtl_EN <- colorBin(Total, domain = data$Ttl_EN, bins = bin_edgesTtl_EN, right = TRUE)
+palTtl_IN <- colorBin(Total, domain = data$Ttl_IN, bins = bin_edgesTtl_IN, right = TRUE)
+palTtl_LAC <- colorBin(Total, domain = data$Ttl_LAC, bins = bin_edgesTtl_LAC, right = TRUE)
+palTtl_ND <- colorBin(Total, domain = data$Ttl_ND, bins = bin_edgesTtl_ND, right = TRUE)
+palTtl_PCO <- colorBin(Total, domain = data$Ttl_PCO, bins = bin_edgesTtl_PCO, right = TRUE)
+
+Ttl_SUMlabels <- sprintf("<strong>%s</strong><br/>Total Score %g / 40",data$DISTRIC, data$Ttl_SUM) %>% lapply(htmltools::HTML)
+
+Ttl_ENlabels <- sprintf(
+  "<strong>%s</strong><br/>%s / 10 Indicators of Endemicity <br/> %s BU Endemicity <br/> %s LF Endemicity",
+  data$DISTRIC, data$Ttl_EN, data$BU_qunt, data$LF_qntl) %>% lapply(htmltools::HTML)
+
+Ttl_INlabels <- sprintf(
+  "<strong>%s</strong><br/>%s / 10 Vulnerability to Infection <br/> %s Improved Housing <br/> %s Wealth Index",
+  data$DISTRIC, data$Ttl_IN, data$Hsng_qn_rev, data$wlth_qn_rev) %>% lapply(htmltools::HTML)
+
+Ttl_LAClabels <- sprintf(
+  "<strong>%s</strong><br/>%s / 10 Low Access to Care <br/> %s Travel time to HCC <br/> %s DPT Vaccine Coverage ",
+  data$DISTRIC, data$Ttl_LAC, data$csts_qn, data$DPT_qnt_rev) %>% lapply(htmltools::HTML)
+
+Ttl_NDlabels <- sprintf(
+  "<strong>%s</strong><br/>%s / 5 Risk for Non-diagnosis <br/> %s People Per HCC",
+  data$DISTRIC, data$Ttl_ND, data$HCC_qn0) %>% lapply(htmltools::HTML)
+
+Ttl_PCOlabels <- sprintf(
+  "<strong>%s</strong><br/>%s / 5 Risk for Poor Clinical Outcomes <br/> %s U5M",
+  data$DISTRIC, data$Ttl_PCO, data$U5M_qnt) %>% lapply(htmltools::HTML)
+
+legend_labels40 <- c("[1, 7)", "[8, 15)", "[16, 23)", "[24, 31)", "[32, 40)")
+legend_labels10 <- c("[1, 2)", "[3, 4)", "[5, 6)", "[7, 8)", "[9, 10)")
+legend_labels5 <- c("[1)", "[2)", "[3)", "[4)", "[5)")
+
+map <- leaflet(data) %>%
+
+  
+  addPolygons(fillColor = ~palTtl_SUM(Ttl_SUM), 
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              group = "Total",
+              dashArray = "",
+              fillOpacity = 2, 
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = FALSE),
+              label = Ttl_SUMlabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+ 
+    addPolygons(fillColor = ~palTtl_EN(Ttl_EN), 
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              group = "Indicators of Endemicity",
+              dashArray = "",
+              fillOpacity = 2, 
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = FALSE),
+              label = Ttl_ENlabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+
+    addPolygons(fillColor = ~palTtl_IN(Ttl_IN), 
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              group = "Vulnerability to Infection",
+              dashArray = "",
+              fillOpacity = 2, 
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = FALSE),
+              label = Ttl_INlabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+  
+      addPolygons(fillColor = ~palTtl_LAC(Ttl_LAC), 
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              group = "Low Access to Care",
+              dashArray = "",
+              fillOpacity = 2, 
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = FALSE),
+              label = Ttl_LAClabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+  
+        addPolygons(fillColor = ~palTtl_ND(Ttl_ND), 
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              group = "Risk Factors for Non-Diagnosis",
+              dashArray = "",
+              fillOpacity = 2, 
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = FALSE),
+              label = Ttl_NDlabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+  
+          addPolygons(fillColor = ~palTtl_PCO(Ttl_PCO), 
+              weight = 1,
+              opacity = 1,
+              color = "black",
+              group = "Risk Factors for Poor Clinical Outcome",
+              dashArray = "",
+              fillOpacity = 2, 
+              highlight = highlightOptions(
+                weight = 5,
+                color = "#666",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = FALSE),
+              label = Ttl_PCOlabels,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"))%>%
+
+    # Layers control
+  addLayersControl(
+    overlayGroups = c("Total", "Indicators of Endemicity", "Vulnerability to Infection", "Low Access to Care", "Risk Factors for Non-Diagnosis", "Risk Factors for Poor Clinical Outcome"),
+    
+    options = layersControlOptions(collapsed = FALSE)) %>% 
+  
+    addLegend(pal = palTtl_SUM, values = ~Ttl_SUM, opacity = 0.7, title = NULL,
+            position = "bottomleft", group = "Total",
+    labels = legend_labels40)%>% 
+  
+  addLegend(pal = palTtl_EN, values = ~Ttl_EN, opacity = 0.7, title = NULL,
+            position = "bottomleft", group = "Indicators of Endemicity",
+    labels = legend_labels10)%>% 
+  
+    addLegend(pal = palTtl_IN, values = ~Ttl_IN, opacity = 0.7, title = NULL,
+            position = "bottomleft", group = "Vulnerability to Infection",
+    labels = legend_labels10)%>% 
+  
+  addLegend(pal = palTtl_LAC, values = ~Ttl_LAC, opacity = 0.7, title = NULL,
+            position = "bottomleft", group = "Low Access to Care",
+    labels = legend_labels10)%>% 
+  
+    addLegend(pal = palTtl_ND, values = ~Ttl_ND, opacity = 0.7, title = NULL,
+            position = "bottomleft", group = "Risk Factors for Non-Diagnosis",
+    labels = legend_labels5)%>% 
+  
+    addLegend(pal = palTtl_PCO, values = ~Ttl_PCO, opacity = 0.7, title = NULL,
+            position = "bottomleft", group = "Risk Factors for Poor Clinical Outcome",
+    labels = legend_labels5)%>% 
+
+  hideGroup(c("Total", "Indicators of Endemicity", "Vulnerability to Infection", "Low Access to Care", "Risk Factors for Non-Diagnosis", "Risk Factors for Poor Clinical Outcome"))
+```
+
+```{r Map, echo=FALSE}
+
+map
+
+```
+
+
+### Chart 2 - Quintiles Data Table
+```{r Data Table2, echo=FALSE}
+
+datatable(df_q, filter = "top", options = list(
+  pageLength = 260,
+  searching = TRUE,
+  order = list()  # This disables initial sorting
+))
+
+```
+
+
+### Chart 3 - Raw Data Table
+```{r Data Table raw, echo=FALSE}
+
+datatable(df_mean, filter = "top", options = list(
+  pageLength = 260,
+  searching = TRUE,
+  order = list()  # This disables initial sorting
+))
+
+```
+
