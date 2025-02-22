@@ -85,13 +85,16 @@ library(stargazer)
 library(DT)
 library(pandoc)
 
-setwd("/Users/williamjoneswarner/Desktop/Work/Buruli Ulcer/Dashboard/Dashboard R Project")
+setwd("/Users/williamjoneswarner/Desktop/Work/Buruli Ulcer/Dashboard/Dashboard R Project/Final Workings")
 
-df <- read.csv("Dashboard_files/Mean_Quint_merged_shp.csv")
+getwd()
 
-df$wlth_qn_rev <- 6-df$wlth_qn 
-df$Hsng_qn_rev <- 6-df$Hsng_qn
-df$DPT_qnt_rev <- 6-df$DPT_qnt
+df <- read.csv("Mean_Quint_Filtered_108_shp2.csv")
+
+#already reverse in og dataset (see "workings") keeping it as this as less amendments in script
+df$wlth_qn_rev <- df$wlth_q_ 
+df$Hsng_qn_rev <- df$Hsng_q_
+df$DPT_qnt_rev <- df$DPT_qn_
 
 names(df)
 selected_columns <- df[c("OBJECTI", "REGION", "DISTRIC")]
@@ -109,10 +112,12 @@ colnames(df_q) <- c("OBJECTID", "REGION", "DISTRICT", "EN - BU", "EN - LF", "IN 
 
 head(df_q)
 
-df_q$Total <- (df_q$`LAC - Travel Costs` + df_q$`IN - Wealth` + df_q$`PCO - U5M` + df_q$`ND - Pop Per HCC` + df_q$`EN - BU` + df_q$`IN - Improved Housing` + df_q$`LAC - DPT` + df_q$`EN - LF`)
+df_q$'Unweighted Total' <- (df_q$`LAC - Travel Costs` + df_q$`IN - Wealth` + df_q$`PCO - U5M` + df_q$`ND - Pop Per HCC` + df_q$`EN - BU` + df_q$`IN - Improved Housing` + df_q$`LAC - DPT` + df_q$`EN - LF`)
+
+df_q$'Weighted Total' <- (df_q$`LAC - Travel Costs` + df_q$`IN - Wealth` + df_q$`PCO - U5M`*2 + df_q$`ND - Pop Per HCC`*2 + df_q$`EN - BU` + df_q$`IN - Improved Housing` + df_q$`LAC - DPT` + df_q$`EN - LF`)
 
 df_mean <- df %>% 
-  select(OBJECTI, REGION, DISTRIC,  BU_cvrg, LF, imprv_h, wlth_mn, csts_mn, dpt_cvr, pp__HCC, U5M)
+  select(OBJECTI, REGION, DISTRIC,  BU_cvrg, LF, imprv_h, wlth_mn, csts_mn, dpt_cvr, pp_p_HC, U5M)
 
 colnames(df_mean) <- c("OBJECTID", "REGION", "DISTRICT", "EN - BU", "EN - LF", "IN - Improved Housing", "IN - Wealth", "LAC - Travel Costs", "LAC - DPT", "ND - Pop Per HCC", "PCO - U5M")
 
@@ -131,7 +136,7 @@ The coloured boxes in the final coloumn labeled 'Distrcit Level Mectics/Proxies"
 
 Boxes with '*' represent datasets not currently available but would represent good indicators or proxies. 
 
-![](Dashboard_files/conceptual_framework_BU5.png)
+![](conceptual_framework_BU6.png)
 
 
 ### Chart 1 - Map
@@ -140,22 +145,28 @@ Please Selected a layer to display
 
 ```{r Map Setup, include=FALSE, cache=FALSE, echo=FALSE}
 
-data <- st_read("Dashboard_files/Mean_Quint_merged_shp2.shp")
-columns_to_remove <- c("mbl_qnt", "mobl_mn", "urbn_qn", "urbn_pr", "rod_qnt", "Pr_wt1R", "pp_dnst", "pop_qnt", "MVC_cvr", "MVC_qnt")
-data <-  data %>% select(-one_of(columns_to_remove))
+data <- st_read("Mean_Quint_Filtered_108_shp2.shp")
+background_data <- st_read("GHA ADM0/gha_admbnda_adm0_gss_20210308.shp")
 
-data$wlth_qn_rev <- 6-data$wlth_qn
-data$Hsng_qn_rev <- 6-data$Hsng_qn
-data$DPT_qnt_rev <- 6-data$DPT_qnt
-data$Ttl_SUM <- data$csts_qn + data$U5M_qnt + data$HCC_qn0 + data$BU_qunt + data$LF_qntl + data$wlth_qn_rev + data$Hsng_qn_rev + data$DPT_qnt_rev
 
+#columns_to_remove <- c("mbl_qnt", "mobl_mn", "urbn_qn", "urbn_pr", "rod_qnt", "Pr_wt1R", #"pp_dnst", "pop_qnt", "MVC_cvr", "MVC_qnt")
+#data <-  data %>% select(-one_of(columns_to_remove))
+
+#the data has already been reversed! so just doing this to maintain the script. 
+data$wlth_qn_rev <- data$wlth_q_
+data$Hsng_qn_rev <- data$Hsng_q_
+data$DPT_qnt_rev <- data$DPT_qn_
 names(data)
 
 data$Ttl_EN <- data$BU_qunt + data$LF_qntl
 data$Ttl_IN <- data$Hsng_qn_rev + data$wlth_qn_rev
 data$Ttl_LAC <- data$csts_qn + data$DPT_qnt_rev
-data$Ttl_ND <- data$HCC_qn0
-data$Ttl_PCO <- data$U5M_qnt
+data$Ttl_ND <- data$HCC_qn0*2
+data$Ttl_PCO <- data$U5M_qnt*2
+
+data$Ttl_SUM <- data$Ttl_EN + data$Ttl_IN + data$Ttl_LAC + data$Ttl_ND + data$Ttl_PCO
+
+st_write(data, "Mean_Quint_Figure_108_shp2.shp", overwrite = TRUE, append=FALSE)
 
 names(data)
 
@@ -163,12 +174,12 @@ quantiles <- (0:5) / 5
 
 # Define your custom bin edges
 
-bin_edgesTtl_SUM <- c(0, 7, 15, 23, 31, 40)
+bin_edgesTtl_SUM <- c(14, 26, 29, 31, 34, 43)
 bin_edgesTtl_EN <- c(0,2,4,6,8,10)
 bin_edgesTtl_IN <- c(0,2,4,6,8,10)
 bin_edgesTtl_LAC <- c(0,2,4,6,8,10)
-bin_edgesTtl_ND <- c(0,1,2,3,4,5)
-bin_edgesTtl_PCO <- c(0,1,2,3,4,5)
+bin_edgesTtl_ND <- c(0,2,4,6,8,10)
+bin_edgesTtl_PCO <- c(0,2,4,6,8,10)
 
 
 
@@ -184,14 +195,14 @@ palTtl_LAC <- colorBin(Total, domain = data$Ttl_LAC, bins = bin_edgesTtl_LAC, ri
 palTtl_ND <- colorBin(Total, domain = data$Ttl_ND, bins = bin_edgesTtl_ND, right = TRUE)
 palTtl_PCO <- colorBin(Total, domain = data$Ttl_PCO, bins = bin_edgesTtl_PCO, right = TRUE)
 
-Ttl_SUMlabels <- sprintf("<strong>%s</strong><br/>Total Score %g / 40",data$DISTRIC, data$Ttl_SUM) %>% lapply(htmltools::HTML)
+Ttl_SUMlabels <- sprintf("<strong>%s</strong><br/>Total Score %g / 50",data$DISTRIC, data$Ttl_SUM) %>% lapply(htmltools::HTML)
 
 Ttl_ENlabels <- sprintf(
-  "<strong>%s</strong><br/>%s / 10 Indicators of Endemicity <br/> %s BU Endemicity <br/> %s LF Endemicity",
+  "<strong>%s</strong><br/>%s / 10 Total Endemicity <br/> %s BU Endemicity <br/> %s LF Endemicity",
   data$DISTRIC, data$Ttl_EN, data$BU_qunt, data$LF_qntl) %>% lapply(htmltools::HTML)
 
 Ttl_INlabels <- sprintf(
-  "<strong>%s</strong><br/>%s / 10 Vulnerability to Infection <br/> %s Improved Housing <br/> %s Wealth Index",
+  "<strong>%s</strong><br/>%s / 10 Vulnerability to Disease <br/> %s Improved Housing <br/> %s Wealth Index",
   data$DISTRIC, data$Ttl_IN, data$Hsng_qn_rev, data$wlth_qn_rev) %>% lapply(htmltools::HTML)
 
 Ttl_LAClabels <- sprintf(
@@ -199,25 +210,40 @@ Ttl_LAClabels <- sprintf(
   data$DISTRIC, data$Ttl_LAC, data$csts_qn, data$DPT_qnt_rev) %>% lapply(htmltools::HTML)
 
 Ttl_NDlabels <- sprintf(
-  "<strong>%s</strong><br/>%s / 5 Risk for Non-diagnosis <br/> %s People Per HCC",
+  "<strong>%s</strong><br/>%s / 10 Low Availability of Health Services <br/> %s People Per HCC",
   data$DISTRIC, data$Ttl_ND, data$HCC_qn0) %>% lapply(htmltools::HTML)
 
 Ttl_PCOlabels <- sprintf(
-  "<strong>%s</strong><br/>%s / 5 Risk for Poor Clinical Outcomes <br/> %s U5M",
+  "<strong>%s</strong><br/>%s / 10 Risk for Poor Clinical Outcomes <br/> %s U5M",
   data$DISTRIC, data$Ttl_PCO, data$U5M_qnt) %>% lapply(htmltools::HTML)
+
+#Ttl_SUMlabels <- unlist(Ttl_SUMlabels)
+#Ttl_ENlabels <- unlist(Ttl_ENlabels)
+#Ttl_INlabels <- unlist(Ttl_INlabels)
+#Ttl_LAClabels <- unlist(Ttl_LAClabels)
+#Ttl_NDlabels <- unlist(Ttl_NDlabels)
+#Ttl_PCOlabels <- unlist(Ttl_PCOlabels)
 
 legend_labels40 <- c("[1, 7)", "[8, 15)", "[16, 23)", "[24, 31)", "[32, 40)")
 legend_labels10 <- c("[1, 2)", "[3, 4)", "[5, 6)", "[7, 8)", "[9, 10)")
-legend_labels5 <- c("[1)", "[2)", "[3)", "[4)", "[5)")
+legend_labels5 <- c("[2)", "[4)", "[6)", "[8)", "[10)")
 
 map <- leaflet(data) %>%
 
+    # Add the background layer
+  addPolygons(data = background_data, 
+              fillColor = "grey", 
+              color = "grey", 
+              weight = 1, 
+              opacity = 0.5, 
+              fillOpacity = 0.2, 
+              group = "Background") %>%
   
   addPolygons(fillColor = ~palTtl_SUM(Ttl_SUM), 
               weight = 1,
               opacity = 1,
               color = "black",
-              group = "Total",
+              group = "Total Score",
               dashArray = "",
               fillOpacity = 2, 
               highlight = highlightOptions(
@@ -236,7 +262,7 @@ map <- leaflet(data) %>%
               weight = 1,
               opacity = 1,
               color = "black",
-              group = "Indicators of Endemicity",
+              group = "Total Endemicity",
               dashArray = "",
               fillOpacity = 2, 
               highlight = highlightOptions(
@@ -255,7 +281,7 @@ map <- leaflet(data) %>%
               weight = 1,
               opacity = 1,
               color = "black",
-              group = "Vulnerability to Infection",
+              group = "Vulnerability to Disease",
               dashArray = "",
               fillOpacity = 2, 
               highlight = highlightOptions(
@@ -329,20 +355,20 @@ map <- leaflet(data) %>%
 
     # Layers control
   addLayersControl(
-    overlayGroups = c("Total", "Indicators of Endemicity", "Vulnerability to Infection", "Low Access to Care", "Risk Factors for Non-Diagnosis", "Risk Factors for Poor Clinical Outcome"),
+    overlayGroups = c("Total Score", "Total Endemicity", "Vulnerability to Disease", "Low Access to Care", "Risk Factors for Non-Diagnosis", "Risk Factors for Poor Clinical Outcome"),
     
     options = layersControlOptions(collapsed = FALSE)) %>% 
   
     addLegend(pal = palTtl_SUM, values = ~Ttl_SUM, opacity = 0.7, title = NULL,
-            position = "bottomleft", group = "Total",
+            position = "bottomleft", group = "Total Score",
     labels = legend_labels40)%>% 
   
   addLegend(pal = palTtl_EN, values = ~Ttl_EN, opacity = 0.7, title = NULL,
-            position = "bottomleft", group = "Indicators of Endemicity",
+            position = "bottomleft", group = "Total Endemicity",
     labels = legend_labels10)%>% 
   
     addLegend(pal = palTtl_IN, values = ~Ttl_IN, opacity = 0.7, title = NULL,
-            position = "bottomleft", group = "Vulnerability to Infection",
+            position = "bottomleft", group = "Vulnerability to Disease",
     labels = legend_labels10)%>% 
   
   addLegend(pal = palTtl_LAC, values = ~Ttl_LAC, opacity = 0.7, title = NULL,
@@ -357,7 +383,7 @@ map <- leaflet(data) %>%
             position = "bottomleft", group = "Risk Factors for Poor Clinical Outcome",
     labels = legend_labels5)%>% 
 
-  hideGroup(c("Total", "Indicators of Endemicity", "Vulnerability to Infection", "Low Access to Care", "Risk Factors for Non-Diagnosis", "Risk Factors for Poor Clinical Outcome"))
+  hideGroup(c("Total Score", "Total Endemicity", "Vulnerability to Disease", "Low Access to Care", "Risk Factors for Non-Diagnosis", "Risk Factors for Poor Clinical Outcome"))
 ```
 
 ```{r Map, echo=FALSE}
@@ -371,7 +397,7 @@ map
 ```{r Data Table2, echo=FALSE}
 
 datatable(df_q, filter = "top", options = list(
-  pageLength = 260,
+  pageLength = 108,
   searching = TRUE,
   order = list()  # This disables initial sorting
 ))
@@ -383,7 +409,7 @@ datatable(df_q, filter = "top", options = list(
 ```{r Data Table raw, echo=FALSE}
 
 datatable(df_mean, filter = "top", options = list(
-  pageLength = 260,
+  pageLength = 108,
   searching = TRUE,
   order = list()  # This disables initial sorting
 ))
